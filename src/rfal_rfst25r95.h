@@ -956,7 +956,7 @@ class RfalRfST25R95Class : public RfalRfClass {
      *  \param[in]   rxBufLen           : length of rxBuf
      *  \param[in]   rxRcvdLen          : received length
      *  \param[in]   flags              : TransceiveFlags indication special handling
-     *  \param[in]   additionalRespBytes: additionnal response bytes
+     *  \param[in]   additionalRespBytes: additional response bytes
      *
      *****************************************************************************
      */
@@ -964,9 +964,9 @@ class RfalRfST25R95Class : public RfalRfClass {
 
     /*!
      *****************************************************************************
-     *  \brief  Polls the ST25R95 for incomming data (SPI Interface)
+     *  \brief  Polls the ST25R95 for incoming data (SPI Interface)
      *
-     *  This function is used to poll the ST25R95 for incomming data
+     *  This function is used to poll the ST25R95 for incoming data
      *
      *  \param[in]   timeout: timeout value
      *

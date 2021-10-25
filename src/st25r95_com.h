@@ -155,7 +155,7 @@
 #define ST25R95_IS_PROT_ISO15693_CRC_ERR(status)        (((status) & 0x02U) == 0x02U) /*!< Test for CRC flag in SendRcv response additional byte for ISO15693 protocol */
 #define ST25R95_IS_PROT_ISO15693_COLLISION_ERR(status)  (((status) & 0x01U) == 0x01U) /*!< Test for Collision flag in SendRcv response additional byte for ISO15693 protocol*/
 
-#define ST25R95_IS_PROT_ISO14443A_COLLISION_ERR(status) (((status) & 0x80U) == 0x80U) /*!< Test for Colission flag in SendRcv response additional byte for ISO14443A protocol */
+#define ST25R95_IS_PROT_ISO14443A_COLLISION_ERR(status) (((status) & 0x80U) == 0x80U) /*!< Test for Collision flag in SendRcv response additional byte for ISO14443A protocol */
 #define ST25R95_IS_PROT_ISO14443A_CRC_ERR(status)       (((status) & 0x20U) == 0x20U) /*!< Test for CRC       flag in SendRcv response additional byte for ISO14443A protocol */
 #define ST25R95_IS_PROT_ISO14443A_PARITY_ERR(status)    (((status) & 0x10U) == 0x10U) /*!< Test for Parity    flag in SendRcv response additional byte for ISO14443A protocol */
 
