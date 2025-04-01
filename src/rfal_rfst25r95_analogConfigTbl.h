@@ -97,6 +97,16 @@ const uint8_t rfalAnalogConfigDefaultSettings[] = {
   , MODE_ENTRY_1_REG((RFAL_ANALOG_CONFIG_POLL | RFAL_ANALOG_CONFIG_TECH_NFCV | RFAL_ANALOG_CONFIG_BITRATE_COMMON | RFAL_ANALOG_CONFIG_RX)
                      , ST25R95_REG_ARC_B, 0x0f, 0x03 /* Receiver Gain 0: 34dB, 1: 32dB, 3: 27dB, 7: 20dB, F: 8dB */
                     )
+#if RFAL_FEATURE_LISTEN_MODE
+  //****** Default Analog Configuration for Listen NFC-A Tx. ******/
+  , MODE_ENTRY_1_REG((RFAL_ANALOG_CONFIG_LISTEN | RFAL_ANALOG_CONFIG_TECH_NFCA | RFAL_ANALOG_CONFIG_BITRATE_COMMON | RFAL_ANALOG_CONFIG_TX)
+                     , ST25R95_REG_ACC_A, 0x0f, 0x07 /* Load modulation index 1: Min, 7: default, F: Max */
+                    )
+  //****** Default Analog Configuration for Listen NFC-A Rx. ******/
+  , MODE_ENTRY_1_REG((RFAL_ANALOG_CONFIG_LISTEN | RFAL_ANALOG_CONFIG_TECH_NFCA | RFAL_ANALOG_CONFIG_BITRATE_COMMON | RFAL_ANALOG_CONFIG_RX)
+                     , ST25R95_REG_ACC_A, 0xf0, 0x20 /* Demod sensivity 1: 10%, 2: 100% */
+                    )
+#endif
 };
 
 #endif /* ST25R95_ANALOGCONFIG_H */

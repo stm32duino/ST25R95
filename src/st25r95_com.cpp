@@ -23,7 +23,7 @@
  *
  *  \author SRA
  *
- *  \brief Implementation of ST25R3911 communication.
+ *  \brief Implementation of ST25R95 communication.
  *
  */
 
@@ -49,14 +49,6 @@
 * LOCAL DEFINES
 ******************************************************************************
 */
-#define ST25R95_POLL_FLAG_DATA_CAN_BE_READ_Pos           (3U)                                                                                       /*!< SPI poll flag bit 3: Data can be read when set */
-#define ST25R95_POLL_FLAG_DATA_CAN_BE_READ_Msk           (0x1U << ST25R95_POLL_FLAG_DATA_CAN_BE_READ_Pos)                                           /*!< Mask 0x08 */
-#define ST25R95_POLL_FLAG_DATA_CAN_BE_READ               ST25R95_POLL_FLAG_DATA_CAN_BE_READ_Msk                                                     /*!< 0x08 */
-#define ST25R95_POLL_DATA_CAN_BE_READ(Flags)             (((Flags) & ST25R95_POLL_FLAG_DATA_CAN_BE_READ_Msk) == ST25R95_POLL_FLAG_DATA_CAN_BE_READ) /*!< SPI read poll flag test */
-#define ST25R95_POLL_FLAG_DATA_CAN_BE_SEND_Pos           (2U)                                                                                       /*!< SPI poll flag bit 2: Data can be send when set */
-#define ST25R95_POLL_FLAG_DATA_CAN_BE_SEND_Msk           (0x1U << ST25R95_POLL_FLAG_DATA_CAN_BE_SEND_Pos)                                           /*!< Mask 0x04 */
-#define ST25R95_POLL_FLAG_DATA_CAN_BE_SEND               ST25R95_POLL_FLAG_DATA_CAN_BE_SEND_Msk                                                     /*!< 0x04 */
-#define ST25R95_POLL_DATA_CAN_BE_SEND(Flags)             (((Flags) & ST25R95_POLL_FLAG_DATA_CAN_BE_SEND_Msk) == ST25R95_POLL_FLAG_DATA_CAN_BE_SEND) /*!< SPI send poll flag test*/
 
 /*
 ******************************************************************************
@@ -154,6 +146,11 @@ ReturnCode RfalRfST25R95Class::st25r95ProtocolSelect(uint8_t protocol)
   if (protocol == ST25R95_PROTOCOL_ISO14443A) {
     st25r95SPISendCommandTypeAndLen(WrRegTimerWindowValue, respBuffer, ST25R95_WRREG_RESPONSE_BUFLEN);
   }
+#if RFAL_FEATURE_LISTEN_MODE
+  if (protocol == ST25R95_PROTOCOL_CE_ISO14443A) {
+    st25r95SPIRxCtx.inListen = false;
+  }
+#endif /* RFAL_FEATURE_LISTEN_MODE */
   return (retCode);
 }
 
@@ -688,7 +685,9 @@ ReturnCode RfalRfST25R95Class::st25r95SPICommandEcho(void)
       }
     }
   }
-
+#if RFAL_FEATURE_LISTEN_MODE
+  st25r95SPIRxCtx.inListen = false;
+#endif /* RFAL_FEATURE_LISTEN_MODE */
   return (retCode);
 }
 
@@ -907,6 +906,12 @@ ReturnCode RfalRfST25R95Class::st25r95SPICompleteRx(void)
   if (st25r95SPIRxCtx.rxRcvdLen != NULL) {
     (*st25r95SPIRxCtx.rxRcvdLen) = rcvdLen;
   }
+#if RFAL_FEATURE_LISTEN_MODE
+  if (st25r95SPIRxCtx.protocol == ST25R95_PROTOCOL_CE_ISO14443A) {
+    st25r95SPIRxCtx.inListen = false;
+    st25r95SPIGetLmState(); /* store lmState */
+  }
+#endif /* RFAL_FEATURE_LISTEN_MODE */
   st25r95SPIRxCtx.retCode = retCode;
   return (retCode);
 }
