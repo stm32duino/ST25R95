@@ -37,11 +37,15 @@
 #include "nfc_utils.h"
 
 /*
- ******************************************************************************
- * ENABLE SWITCH
- ******************************************************************************
- */
+******************************************************************************
+* ENABLE SWITCH
+******************************************************************************
+*/
+#ifndef RFAL_FEATURE_NFCV
+  #define RFAL_FEATURE_NFCV   false    /* NFC-V module configuration missing. Disabled by default */
+#endif
 
+#if RFAL_FEATURE_NFCV
 /*
 ******************************************************************************
 * LOCAL MACROS
@@ -462,3 +466,4 @@ ReturnCode iso15693PhyVCDCode1Of256(const uint8_t data, uint8_t *outbuffer, uint
 
   return err;
 }
+#endif /* RFAL_FEATURE_NFCV */

@@ -56,14 +56,15 @@
 * INCLUDES
 ******************************************************************************
 */
+#include "st_errno.h"
 
 /*
 ******************************************************************************
 * GLOBAL DEFINES
 ******************************************************************************
 */
-
 /* See ST95HF DS §4.1.1 or CR95HF DS §4.2.1 */
+
 #define ST25R95_CONTROL_SEND                             0x00 /*!< Send command to the ST25R95 */
 #define ST25R95_CONTROL_RESET                            0x01 /*!< Reset the ST25R95           */
 #define ST25R95_CONTROL_READ                             0x02 /*!< Read data from the ST25R95  */
@@ -171,6 +172,15 @@
 #define ST25R95_DACDATA_MAX                             (0xFCU) /*!< DacData max value (6 bits MSB)   */
 #define ST25R95_IDLE_WKUP_TIMEOUT                       (0x01U) /*!< Idle wakeup source: timeout      */
 #define ST25R95_IDLE_WKUP_TAGDETECT                     (0x02U) /*!< Idle wakeup source: Tag Detected */
+
+#define ST25R95_POLL_FLAG_DATA_CAN_BE_READ_Pos           (3U)                                                                                       /*!< SPI poll flag bit 3: Data can be read when set */
+#define ST25R95_POLL_FLAG_DATA_CAN_BE_READ_Msk           (0x1U << ST25R95_POLL_FLAG_DATA_CAN_BE_READ_Pos)                                           /*!< Mask 0x08 */
+#define ST25R95_POLL_FLAG_DATA_CAN_BE_READ               ST25R95_POLL_FLAG_DATA_CAN_BE_READ_Msk                                                     /*!< 0x08 */
+#define ST25R95_POLL_DATA_CAN_BE_READ(Flags)             (((Flags) & ST25R95_POLL_FLAG_DATA_CAN_BE_READ_Msk) == ST25R95_POLL_FLAG_DATA_CAN_BE_READ) /*!< SPI read poll flag test */
+#define ST25R95_POLL_FLAG_DATA_CAN_BE_SEND_Pos           (2U)                                                                                       /*!< SPI poll flag bit 2: Data can be send when set */
+#define ST25R95_POLL_FLAG_DATA_CAN_BE_SEND_Msk           (0x1U << ST25R95_POLL_FLAG_DATA_CAN_BE_SEND_Pos)                                           /*!< Mask 0x04 */
+#define ST25R95_POLL_FLAG_DATA_CAN_BE_SEND               ST25R95_POLL_FLAG_DATA_CAN_BE_SEND_Msk                                                     /*!< 0x04 */
+#define ST25R95_POLL_DATA_CAN_BE_SEND(Flags)             (((Flags) & ST25R95_POLL_FLAG_DATA_CAN_BE_SEND_Msk) == ST25R95_POLL_FLAG_DATA_CAN_BE_SEND) /*!< SPI send poll flag test*/
 
 
 /*

@@ -36,8 +36,9 @@
 * INCLUDES
 ******************************************************************************
 */
-
+#include "rfal_config.h"
 #include "SPI.h"
+#include "Wire.h"
 #include "rfal_rf.h"
 #include "rfal_nfc.h"
 #include "st_errno.h"
@@ -46,12 +47,20 @@
 #include "st25r95_com.h"
 #include "rfal_rfst25r95_analogConfig.h"
 #include "rfal_rfst25r95_iso15693_2.h"
+#include <functional>
 
 /*
- ******************************************************************************
- * ENABLE SWITCHES
- ******************************************************************************
- */
+******************************************************************************
+* ENABLE SWITCH
+******************************************************************************
+*/
+#ifndef RFAL_FEATURE_LISTEN_MODE
+  #error " RFAL: Module configuration missing. Please enable/disable support for Listen Mode: RFAL_FEATURE_LISTEN_MODE "
+#endif
+
+#ifndef RFAL_FEATURE_WAKEUP_MODE
+  #error " RFAL: Module configuration missing. Please enable/disable support for Wake-Up Mode: RFAL_FEATURE_WAKEUP_MODE "
+#endif
 
 /*
 ******************************************************************************
@@ -101,9 +110,38 @@ typedef struct {
   rfalPostTxRxCallback    postTxRx;    /*!< RFAL's Post TxRx callback   */
 } rfalCallbacks;
 
+
+/*! Struct that holds RFAL's configuration settings                                                      */
+typedef struct {
+  uint8_t                 obsvModeTx;  /*!< RFAL's config of the ST25R3911's observation mode while Tx */
+  uint8_t                 obsvModeRx;  /*!< RFAL's config of the ST25R3911's observation mode while Rx */
+  rfalEHandling           eHandling;   /*!< RFAL's error handling config/mode                          */
+} rfalConfigs;
+
+
+/*! Struct that holds NFC-A data - Used only inside rfalISO14443ATransceiveAnticollisionFrame()          */
+typedef struct {
+  uint8_t                 collByte;    /*!< NFC-A Anticollision collision byte                         */
+  uint8_t                 *buf;        /*!< NFC-A Anticollision frame buffer                           */
+  uint8_t                 *bytesToSend;/*!< NFC-A Anticollision NFCID|UID byte context                 */
+  uint8_t                 *bitsToSend; /*!< NFC-A Anticollision NFCID|UID bit context                  */
+  uint16_t                *rxLength;   /*!< NFC-A Anticollision received length                        */
+  bool                    NfcaSplitFrame;
+} rfalNfcaWorkingData;
+
+
 /*! Struct that holds NFC-F data - Used only inside rfalFelicaPoll() (static to avoid adding it into stack) */
 typedef struct {
+  uint16_t           actLen;                                      /* Received length                         */
+  rfalFeliCaPollRes *pollResList;                                 /* Location of NFC-F device list           */
+  uint8_t            pollResListSize;                             /* Size of NFC-F device list               */
+  uint8_t            devDetected;                                 /* Number of devices detected              */
+  uint8_t            colDetected;                                 /* Number of collisions detected           */
+  uint8_t            *devicesDetected;                            /* Location to place number of devices     */
+  uint8_t            *collisionsDetected;                         /* Location to place number of collisions  */
+  rfalEHandling      curHandling;                                 /* RFAL's error handling                   */
   rfalFeliCaPollRes pollResponses[RFAL_FELICA_POLL_MAX_SLOTS];   /* FeliCa Poll response container for 16 slots */
+  rfalFeliCaPollSlots slots;
 } rfalNfcfWorkingData;
 
 typedef struct {
@@ -113,6 +151,7 @@ typedef struct {
   rfalBitRate           rxBR;      /*!< RFAL's current Rx Bit Rate                      */
   bool                  field;     /*!< Current field state (On / Off)                  */
 
+  rfalConfigs           conf;      /*!< RFAL's configuration settings                 */
   rfalTimings           timings;   /*!< RFAL's timing setting                           */
   rfalTxRx              TxRx;      /*!< RFAL's transceive management                    */
   rfalLm                Lm;        /*!< RFAL's listen mode management                   */
@@ -123,8 +162,16 @@ typedef struct {
 
   uint8_t               protocol;  /*!< ProtocolSelect protocol                         */
   uint8_t               RxInformationBytes[3]; /*!< ST25R95 additional information bytes*/
+
+#if RFAL_FEATURE_LISTEN_MODE
+  bool                  cardEmulT4AT;
+#endif /* RFAL_FEATURE_LISTEN_MODE */
+#if RFAL_FEATURE_NFCA
+  rfalNfcaWorkingData     nfcaData;  /*!< RFAL's working data when supporting NFC-A     */
+#endif /* RFAL_FEATURE_NFCA */
+#if RFAL_FEATURE_NFCF
   rfalNfcfWorkingData   nfcfData; /*!< RFAL's working data when supporting NFC-F        */
-  bool                  NfcaSplitFrame;
+#endif /* RFAL_FEATURE_NFCF */
 } rfal;
 
 /*! Felica's command set */
@@ -202,6 +249,7 @@ typedef struct {
 #define rfalTimerStart(timer, time_ms)         (timer) = timerCalculateTimer((uint16_t)(time_ms)) /*!< Configures and starts the RTOX timer          */
 #define rfalTimerisExpired(timer)              timerIsExpired(timer)          /*!< Checks if timer has expired                   */
 
+#define rfalRunBlocking( e, fn )                 do{ (e)=(fn); rfalWorker(); }while( (e) == ERR_BUSY )
 
 class RfalRfST25R95Class : public RfalRfClass {
   public:
@@ -219,6 +267,7 @@ class RfalRfST25R95Class : public RfalRfClass {
     void rfalSetUpperLayerCallback(rfalUpperLayerCallback pFunc);
     void rfalSetPreTxRxCallback(rfalPreTxRxCallback pFunc);
     void rfalSetPostTxRxCallback(rfalPostTxRxCallback pFunc);
+    void rfalSetLmEonCallback(rfalLmEonCallback pFunc);
     ReturnCode rfalDeinitialize(void);
     ReturnCode rfalSetMode(rfalMode mode, rfalBitRate txBR, rfalBitRate rxBR);
     rfalMode rfalGetMode(void);
@@ -226,7 +275,7 @@ class RfalRfST25R95Class : public RfalRfClass {
     ReturnCode rfalGetBitRate(rfalBitRate *txBR, rfalBitRate *rxBR);
     void rfalSetErrorHandling(rfalEHandling eHandling);
     rfalEHandling rfalGetErrorHandling(void);
-    void rfalSetObsvMode(uint8_t txMode, uint8_t rxMode);
+    void rfalSetObsvMode(uint32_t txMode, uint32_t rxMode);
     void rfalGetObsvMode(uint8_t *txMode, uint8_t *rxMode);
     void rfalDisableObsvMode(void);
     void rfalSetFDTPoll(uint32_t FDTPoll);
@@ -245,12 +294,19 @@ class RfalRfST25R95Class : public RfalRfClass {
     bool rfalIsTransceiveInRx(void);
     ReturnCode rfalGetTransceiveRSSI(uint16_t *rssi);
     void rfalWorker(void);
+    void rfalSetSyncTxRxCallback(rfalSyncTxRxCallback pFunc);
+    bool rfalIsTransceiveSubcDetected(void);
+    ReturnCode rfalISO14443AStartTransceiveAnticollisionFrame(uint8_t *buf, uint8_t *bytesToSend, uint8_t *bitsToSend, uint16_t *rxLength, uint32_t fwt);
+    ReturnCode rfalISO14443AGetTransceiveAnticollisionFrameStatus(void);
+
     ReturnCode rfalISO14443ATransceiveShortFrame(rfal14443AShortFrameCmd txCmd, uint8_t *rxBuf, uint8_t rxBufLen, uint16_t *rxRcvdLen, uint32_t fwt);
     ReturnCode rfalISO14443ATransceiveAnticollisionFrame(uint8_t *buf, uint8_t *bytesToSend, uint8_t *bitsToSend, uint16_t *rxLength, uint32_t fwt);
     ReturnCode rfalFeliCaPoll(rfalFeliCaPollSlots slots, uint16_t sysCode, uint8_t reqCode, rfalFeliCaPollRes *pollResList, uint8_t pollResListSize, uint8_t *devicesDetected, uint8_t *collisionsDetected);
+    ReturnCode rfalStartFeliCaPoll(rfalFeliCaPollSlots slots, uint16_t sysCode, uint8_t reqCode, rfalFeliCaPollRes *pollResList, uint8_t pollResListSize, uint8_t *devicesDetected, uint8_t *collisionsDetected);
+    ReturnCode rfalGetFeliCaPollStatus(void);
     ReturnCode rfalISO15693TransceiveAnticollisionFrame(uint8_t *txBuf, uint8_t txBufLen, uint8_t *rxBuf, uint8_t rxBufLen, uint16_t *actLen);
     ReturnCode rfalISO15693TransceiveEOFAnticollision(uint8_t *rxBuf, uint8_t rxBufLen, uint16_t *actLen);
-    ReturnCode rfalISO15693TransceiveEOF(uint8_t *rxBuf, uint8_t rxBufLen, uint16_t *actLen);
+    ReturnCode rfalISO15693TransceiveEOF(uint8_t *rxBuf, uint16_t rxBufLen, uint16_t *actLen);
     ReturnCode rfalTransceiveBlockingTx(uint8_t *txBuf, uint16_t txBufLen, uint8_t *rxBuf, uint16_t rxBufLen, uint16_t *actLen, uint32_t flags, uint32_t fwt);
     ReturnCode rfalTransceiveBlockingRx(void);
     ReturnCode rfalTransceiveBlockingTxRx(uint8_t *txBuf, uint16_t txBufLen, uint8_t *rxBuf, uint16_t rxBufLen, uint16_t *actLen, uint32_t flags, uint32_t fwt);
@@ -260,7 +316,9 @@ class RfalRfST25R95Class : public RfalRfClass {
     ReturnCode rfalListenStop(void);
     rfalLmState rfalListenGetState(bool *dataFlag, rfalBitRate *lastBR);
     ReturnCode rfalListenSetState(rfalLmState newSt);
+    bool rfalWakeUpModeIsEnabled(void);
     ReturnCode rfalWakeUpModeStart(const rfalWakeUpConfig *config);
+    ReturnCode rfalWakeUpModeGetInfo(bool force, rfalWakeUpInfo *info);
     bool rfalWakeUpModeHasWoke(void);
     ReturnCode rfalWakeUpModeStop(void);
 
@@ -1248,7 +1306,9 @@ class RfalRfST25R95Class : public RfalRfClass {
     ReturnCode rfalTransceiveRunBlockingTx(void);
     bool rfalChipIsBusy(void);
     ReturnCode rfalRunTransceiveWorker(void);
+#if RFAL_FEATURE_WAKEUP_MODE
     void rfalRunWakeUpModeWorker(void);
+#endif /* RFAL_FEATURE_WAKEUP_MODE */
 
     rfalAnalogConfigNum rfalAnalogConfigSearch(rfalAnalogConfigId configId, uint16_t *configOffset);
     uint16_t rfalCrcUpdateCcitt(uint16_t crcSeed, uint8_t dataByte);
