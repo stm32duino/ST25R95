@@ -104,7 +104,7 @@ const uint8_t rfalAnalogConfigDefaultSettings[] = {
                     )
   //****** Default Analog Configuration for Listen NFC-A Rx. ******/
   , MODE_ENTRY_1_REG((RFAL_ANALOG_CONFIG_LISTEN | RFAL_ANALOG_CONFIG_TECH_NFCA | RFAL_ANALOG_CONFIG_BITRATE_COMMON | RFAL_ANALOG_CONFIG_RX)
-                     , ST25R95_REG_ACC_A, 0xf0, 0x20 /* Demod sensivity 1: 10%, 2: 100% */
+                     , ST25R95_REG_ACC_A, 0xf0, 0x20 /* Demod sensitivity 1: 10%, 2: 100% */
                     )
 #endif
 };
